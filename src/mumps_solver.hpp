@@ -109,6 +109,11 @@ namespace pyoomph_mumps
     /// MUMPS phases are collective.
     void solve(Scalar *rhs, std::size_t rhs_len);
 
+    /// Whether the last error was a "the analysis under-predicted the fill-in" one, i.e. one that
+    /// raising ICNTL(14) and factorising again can fix. The analysis is still valid in that case, so
+    /// factorize() may be called again directly.
+    bool last_error_was_workspace() const;
+
     void set_icntl(int i, int value); ///< 1-based, as in the MUMPS user guide
     int get_icntl(int i) const;
     int info(int i) const;

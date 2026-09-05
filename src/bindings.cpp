@@ -119,6 +119,11 @@ namespace
         .def("info", &Solver::info, "i"_a, "Read INFO(i) (this rank), 1-based.")
         .def("infog", &Solver::infog, "i"_a, "Read INFOG(i) (global), 1-based.")
         .def("rinfog", &Solver::rinfog, "i"_a, "Read RINFOG(i) (global), 1-based.")
+        .def("last_error_was_workspace", &Solver::last_error_was_workspace,
+             "Whether the last failure was MUMPS running out of the working space its ANALYSIS\n"
+             "predicted (INFOG(1) in -8,-9,-11,-12,-14,-15,-17,-20).\n\n"
+             "Recoverable: raise ICNTL(14) and call factorize() again. The analysis is kept across\n"
+             "such an error precisely so that this works, so has_analysis stays True.")
         .def("determinant_sign", &Solver::determinant_sign,
              "Sign of the determinant (+1/-1/0), or 0 when unavailable.\n\n"
              "Requires ICNTL(33)=1 to have been set before the factorisation, and is 0 for the\n"

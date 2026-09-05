@@ -22,6 +22,26 @@ namespace pyoomph_mumps
     /// them. MUMPS itself prints a line about most of these, but only when its diagnostic streams
     /// are on - and pyoomph runs it quiet, because a Newton solve that recovers from a failed
     /// factorisation would otherwise print a screenful per retry.
+    /// INFOG(1) codes that all mean one thing: an internal work array was sized from the fill-in the
+    /// ANALYSIS predicted, numerical pivoting then needed more room than that, and MUMPS stopped
+    /// instead of reallocating. They are recoverable - raise ICNTL(14), the percentage of slack added
+    /// to the prediction, and factorise again - so the analysis is deliberately kept across them.
+    ///
+    /// Kept in step with _MUMPS_ICNTL14_ERRORS in pyoomph/solvers/generic.py, which is where the
+    /// python side reads the same list from. Note -19 is NOT one of them: that is the ICNTL(23) hard
+    /// cap on working memory, and asking for more slack against a cap only asks for more of something
+    /// already forbidden.
+    bool is_workspace_error(int infog1)
+    {
+      switch (infog1)
+      {
+      case -8: case -9: case -11: case -12: case -14: case -15: case -17: case -20:
+        return true;
+      default:
+        return false;
+      }
+    }
+
     std::string explain_infog(int infog1, int infog2)
     {
       switch (infog1)
@@ -130,10 +150,13 @@ namespace pyoomph_mumps
     oss << "MUMPS failed while " << what << ": INFOG(1)=" << i1 << ", INFOG(2)=" << i2;
     const std::string why = explain_infog(i1, i2);
     if (!why.empty()) oss << " (" << why << ")";
-    // Whatever state MUMPS is in after an error, it is not one a later phase may build on. Saying so
-    // here is what forces the caller back through a full analyse+factorise rather than letting a
-    // retry walk into the handle that just failed.
-    analysed_ = false;
+    // Whatever state MUMPS is in after an error, it is not one a later phase may build on - with one
+    // exception. A workspace error leaves the ANALYSIS valid: it is the numerical factorisation that
+    // ran out of the room the analysis predicted, and MUMPS's own manual's remedy is to raise
+    // ICNTL(14) and call the factorisation again on the same analysis. Clearing analysed_ here too
+    // would make that documented recovery impossible - factorize() would refuse - and force a full
+    // re-analysis for a condition that does not need one.
+    if (!is_workspace_error(i1)) analysed_ = false;
     factorised_ = false;
     throw MumpsError(oss.str(), i1, i2);
   }
@@ -269,6 +292,11 @@ namespace pyoomph_mumps
     id_.rhs = (rhs_len > 0) ? reinterpret_cast<MumpsScalar *>(rhs) : nullptr;
     run_job(3, "solving with the factorised matrix");
     id_.rhs = nullptr;
+  }
+
+  template <typename Scalar> bool MumpsSolver<Scalar>::last_error_was_workspace() const
+  {
+    return is_workspace_error(id_.infog[0]);
   }
 
   template <typename Scalar> void MumpsSolver<Scalar>::set_icntl(int i, int value)
