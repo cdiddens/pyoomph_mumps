@@ -52,6 +52,11 @@ jobs:
           cd "$RUNNER_TEMP"
           python -c "import pyoomph_mumps as pm; print('has_mpi =', pm.has_mpi); print('MUMPS', pm.mumps_version)"
 
+      # From OUTSIDE the source tree, deliberately. The repository root contains a pyoomph_mumps/
+      # directory holding only the Python half of the package, and it shadows the installed one -
+      # so a test run started there imports a package with no compiled extension in it and fails
+      # at `from ._pyoomph_mumps_core import ...`, which looks exactly like a broken build.
       - name: Test
         run: |
-          python -m pytest tests -q --color=yes
+          cd "$RUNNER_TEMP"
+          python -m pytest "$GITHUB_WORKSPACE/tests" -q --color=yes
