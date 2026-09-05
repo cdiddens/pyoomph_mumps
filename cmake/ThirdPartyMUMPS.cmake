@@ -297,7 +297,13 @@ elseif(PYOOMPH_MUMPS_DOWNLOAD)
   # OpenMP inside MUMPS is a separate question from OpenMP in this extension's own (nonexistent)
   # loops: it is what makes a single-rank factorisation use more than one core, and it is what
   # ICNTL(16) then controls at run time.
-  if(PYOOMPH_MUMPS_USE_OPENMP)
+  #
+  # PYOOMPH_MUMPS_HAS_OPENMP, not PYOOMPH_MUMPS_USE_OPENMP: the latter is the tri-state REQUEST, and
+  # its default "AUTO" is a true-ish string in CMake, so testing it directly told the superbuild to
+  # build with OpenMP on every machine that has none - AppleClang, for one, where MUMPS then fails
+  # its own find_package(OpenMP REQUIRED). HAS_OPENMP is the ANSWER the probe in CMakeLists.txt
+  # arrived at, and ON there has already failed the build if it could not be met.
+  if(PYOOMPH_MUMPS_HAS_OPENMP)
     set(_pyoomph_mumps_omp ON)
   else()
     set(_pyoomph_mumps_omp OFF)
