@@ -1,0 +1,57 @@
+# A single, deliberately minimal smoke test: does the source install work on an Apple-silicon
+# machine that has nothing but Homebrew's compilers, and does the standalone test suite pass?
+#
+# Serial on purpose (PYOOMPH_MUMPS_USE_MPI stays OFF): the MPI pairing has to match how pyoomph
+# itself was built, which is a property of the user's machine, not of a runner.
+name: macOS arm64
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: macos-14 (arm64), Python ${{ matrix.python-version }}
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # cmake and ninja are already on the image; gcc is here only for gfortran, which the MUMPS
+      # download route needs and which AppleClang does not provide. Homebrew names the binary with
+      # its major version (gfortran-14), so point CMake at the unversioned symlink in gcc's prefix
+      # rather than guessing the number.
+      - name: Install build prerequisites
+        run: |
+          brew install gcc
+          echo "FC=$(brew --prefix gcc)/bin/gfortran" >> "$GITHUB_ENV"
+
+      - name: Show toolchain
+        run: |
+          "$FC" --version | head -1
+          cmake --version | head -1
+          python -c "import sys; print(sys.version)"
+
+      # BLAS/LAPACK is left on AUTO, which finds Apple's Accelerate framework. No MPI, no OpenMP
+      # (AppleClang ships none), so this is the plainest configuration there is.
+      - name: Install
+        run: pip install -v ".[test]"
+
+      - name: Report what was built
+        run: |
+          cd "$RUNNER_TEMP"
+          python -c "import pyoomph_mumps as pm; print('has_mpi =', pm.has_mpi); print('MUMPS', pm.mumps_version)"
+
+      - name: Test
+        run: |
+          python -m pytest tests -q --color=yes
