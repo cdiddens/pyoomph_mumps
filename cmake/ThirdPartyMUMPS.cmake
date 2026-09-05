@@ -303,6 +303,19 @@ elseif(PYOOMPH_MUMPS_DOWNLOAD)
     set(_pyoomph_mumps_omp OFF)
   endif()
 
+  # The libraries do not exist yet at configure time, so they are named rather than found. The order
+  # is the link order a static build needs: the arithmetic libraries call into mumps_common, which
+  # calls into pord.
+  set(_l "${_pyoomph_mumps_install}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}")
+  set(_s "${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  set(PYOOMPH_MUMPS_INCLUDE_DIRS "${_pyoomph_mumps_install}/include")
+  set(PYOOMPH_MUMPS_LIBRARIES "${_l}dmumps${_s}" "${_l}zmumps${_s}" "${_l}mumps_common${_s}" "${_l}pord${_s}")
+  if(NOT PYOOMPH_MUMPS_USE_MPI)
+    # MUMPS's serial stub: the library that provides the MPI_* symbols a non-parallel build still
+    # calls. Not a real MPI, and never present in a parallel build.
+    list(APPEND PYOOMPH_MUMPS_LIBRARIES "${_l}mpiseq${_s}")
+  endif()
+
   # Static (BUILD_SHARED_LIBS=OFF, the superbuild's own default). A shared MUMPS in a private prefix
   # would need either an RPATH into the build tree or an LD_LIBRARY_PATH the user has to set, and
   # this prefix is inside the build directory rather than anywhere installed. Static libraries get
@@ -334,24 +347,16 @@ elseif(PYOOMPH_MUMPS_DOWNLOAD)
       -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
       ${_pyoomph_mumps_version_arg}
       ${_pyoomph_lapack_args}
+    # EVERY library that will be linked, not just the interesting ones. A file that is linked but
+    # not declared here has no rule that produces it, which Ninja reports as
+    # "missing and no known rule to make it" and refuses to build - libpord.a and libmpiseq.a were
+    # exactly that. The Makefile generator is more forgiving and hides the omission, so this is a
+    # bug that only appears on Ninja generators.
     BUILD_BYPRODUCTS
-      "${_pyoomph_mumps_install}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}dmumps${CMAKE_STATIC_LIBRARY_SUFFIX}"
-      "${_pyoomph_mumps_install}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}zmumps${CMAKE_STATIC_LIBRARY_SUFFIX}"
-      "${_pyoomph_mumps_install}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}mumps_common${CMAKE_STATIC_LIBRARY_SUFFIX}"
+      ${PYOOMPH_MUMPS_LIBRARIES}
       "${_pyoomph_mumps_install}/include/dmumps_c.h"
   )
   list(APPEND PYOOMPH_MUMPS_DEPENDS pyoomph_mumps_external)
-
-  # The libraries do not exist yet at configure time, so they are named rather than found. The order
-  # is the link order a static build needs: the arithmetic libraries call into mumps_common, which
-  # calls into pord.
-  set(_l "${_pyoomph_mumps_install}/${CMAKE_INSTALL_LIBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}")
-  set(_s "${CMAKE_STATIC_LIBRARY_SUFFIX}")
-  set(PYOOMPH_MUMPS_INCLUDE_DIRS "${_pyoomph_mumps_install}/include")
-  set(PYOOMPH_MUMPS_LIBRARIES "${_l}dmumps${_s}" "${_l}zmumps${_s}" "${_l}mumps_common${_s}" "${_l}pord${_s}")
-  if(NOT PYOOMPH_MUMPS_USE_MPI)
-    list(APPEND PYOOMPH_MUMPS_LIBRARIES "${_l}mpiseq${_s}")
-  endif()
 
   # What a STATIC MUMPS needs after itself. A static archive contributes only the members that
   # resolve symbols already referenced, so these have to FOLLOW the MUMPS libraries on the link
