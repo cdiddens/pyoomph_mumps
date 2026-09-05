@@ -1,0 +1,55 @@
+[project]
+name = "pyoomph_mumps"
+description = "A direct MUMPS binding for pyoomph - linear solver and Spectra eigensolver backend"
+dependencies = [
+'numpy>=1.24.4',
+'scipy>=1.10.1',
+]
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [  { name="Christian Diddens", email="c.diddens@utwente.nl" }  ]
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+classifiers=[
+        'Development Status :: 3 - Alpha',
+        'Intended Audience :: Science/Research',
+        'Natural Language :: English',
+        'Operating System :: POSIX :: Linux',
+        'Operating System :: Unix',
+        'Operating System :: MacOS :: MacOS X',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
+        'Topic :: Scientific/Engineering',
+        'Topic :: Scientific/Engineering :: Mathematics',
+        'Topic :: Scientific/Engineering :: Physics'
+    ]
+version = "0.0.1"
+
+# pyoomph is deliberately NOT a hard dependency. The extension talks to nothing but numpy arrays, so
+# it builds, imports and passes its own test suite without pyoomph installed - which is what makes it
+# possible to debug a MUMPS problem without a finite element problem in the way. The pyoomph side of
+# the coupling lives entirely in pyoomph/solvers/mumps.py, on the pyoomph side of the fence.
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.urls]
+source = "https://github.com/pyoomph/pyoomph"
+
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0.0"]
+build-backend = "scikit_build_core.build"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+# Same static path as pyoomph's, and for the same reason: {cache_tag}/{wheel_tag} would bake in the
+# Python ABI and force a full reconfigure - including a fresh MUMPS download and build, which is by
+# far the most expensive part here - for every interpreter. {state} only separates wheel/editable/
+# sdist builds from each other.
+build-dir = "build/{state}"
+cmake.build-type = "Release"
+wheel.packages = ["pyoomph_mumps"]
+
+# No [tool.cibuildwheel] section, deliberately. A wheel would have to carry a MUMPS built against
+# some particular BLAS and MPI, and the whole point of this package is that those are the user's
+# choice: an MPI-enabled pyoomph needs an MPI-enabled MUMPS on the SAME MPI implementation, which no
+# prebuilt wheel can promise. Install from source.
