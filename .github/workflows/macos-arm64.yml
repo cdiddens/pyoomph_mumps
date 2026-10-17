@@ -13,8 +13,8 @@ on:
 
 jobs:
   build-and-test:
-    name: macos-14 (arm64), Python ${{ matrix.python-version }}
-    runs-on: macos-14
+    name: macos-15 (arm64), Python ${{ matrix.python-version }}
+    runs-on: macos-15
     strategy:
       fail-fast: false
       matrix:
